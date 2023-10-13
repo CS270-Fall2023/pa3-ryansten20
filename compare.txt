@@ -1,0 +1,96 @@
+The main difference of this program is that it uses lseek() to find the end of the file
+This example was taken from chat gpt. It prints the last N lines of the file given by the user.
+This is a basic implementation and does not only print the last 10 lines or start at a certain index
+It will print the last N lines, specified by the user
+It look like the file was read in backwards instead of forwards, which makes more sense.
+
+
+
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+void print_tail(const char *filename, int n) {
+    int fd;
+    off_t file_size;
+    char ch;
+    int count = 0;
+    int target_line = 0;
+    
+    // Open file for reading
+    fd = open(filename, O_RDONLY);
+    if (fd == -1) {
+        perror("Cannot open file");
+        exit(EXIT_FAILURE);
+    }
+
+    // Get file size
+    file_size = lseek(fd, 0, SEEK_END);
+    if (file_size == -1) {
+        perror("Cannot seek file");
+        close(fd);
+        exit(EXIT_FAILURE);
+    }
+
+    // Scan from the end of the file and count the number of lines
+    for (off_t i = file_size - 1; i >= 0; i--) {
+        // Move the file offset to the i'th byte from the beginning
+        if (lseek(fd, i, SEEK_SET) == -1) {
+            perror("Cannot seek file");
+            close(fd);
+            exit(EXIT_FAILURE);
+        }
+
+        // Read one character
+        if (read(fd, &ch, 1) != 1) {
+            perror("Cannot read file");
+            close(fd);
+            exit(EXIT_FAILURE);
+        }
+
+        // If newline character is found, increment the line count
+        if (ch == '\n') {
+            count++;
+            if (count == n+1) {
+                // Target offset to start reading from
+                target_line = i + 1;
+                break;
+            }
+        }
+    }
+
+    // Print last n lines
+    if (lseek(fd, target_line, SEEK_SET) == -1) {
+        perror("Cannot seek file");
+        close(fd);
+        exit(EXIT_FAILURE);
+    }
+    char buffer[BUFSIZ];
+    ssize_t bytes_read;
+    while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0) {
+        write(STDOUT_FILENO, buffer, bytes_read);
+    }
+
+    // Close the file
+    close(fd);
+}
+
+int main(int argc, char *argv[]) {
+    // Validate input arguments
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s <filename> <n>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+    // Convert argument to integer and call print_tail
+    int n = atoi(argv[2]);
+    if (n <= 0) {
+        fprintf(stderr, "Number of lines (n) must be positive.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    print_tail(argv[1], n);
+
+    return 0;
+}
