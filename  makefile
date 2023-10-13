@@ -1,0 +1,7 @@
+all: tail
+
+tail: main.o
+	gcc main.o -o tail
+
+main.o: main.c
+	gcc -Wall -c main.c
